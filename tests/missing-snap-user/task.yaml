@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+summary: non-matching SNAP_USER does not resolve arbitrary users
+details: |
+  This test ensures the NSS module returns NOTFOUND semantics when SNAP_USER is
+  unset or does not match the queried account name. It protects against
+  accidental synthesis of unrelated users and validates safe chain fallback.
+execute: |
+  set -eu
+
+  target_user="snapd-missing-user"
+
+  unset SNAP_USER
+  output="$(getent passwd "$target_user" || true)"
+  printf '%s\n' "$output" | NOMATCH "^${target_user}:"
+
+  export SNAP_USER="4242:snapd-synthetic"
+  output="$(getent passwd "$target_user" || true)"
+  printf '%s\n' "$output" | NOMATCH "^${target_user}:"

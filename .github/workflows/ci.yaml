@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build and run checks
+        run: make check
+
+  spread:
+    name: spread (${{ matrix.garden-system }})
+    needs: build-check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        garden-system:
+          - ubuntu-cloud-16.04
+          - ubuntu-cloud-18.04
+          - ubuntu-cloud-20.04
+          - ubuntu-cloud-22.04
+          - ubuntu-cloud-24.04
+          - ubuntu-cloud-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run spread integration tests
+        uses: zyga/image-garden-action@v0
+        with:
+          image-garden-channel: latest/edge
+          garden-system: ${{ matrix.garden-system }}
+          spread-artifacts: spread-artifacts
+          spread-artifacts-suffix: ${{ matrix.garden-system }}
+
+      - name: Upload spread artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-spread-artifacts-${{ matrix.garden-system }}
+          path: spread-artifacts/
+          if-no-files-found: warn

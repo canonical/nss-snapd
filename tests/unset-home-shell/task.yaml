@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+summary: unset SNAP_REAL_HOME and SHELL use fallback values
+details: |
+  This test checks that optional environment variables are truly optional by
+  confirming deterministic fallback values are used when SNAP_REAL_HOME and
+  SHELL are unset, while SNAP_USER still drives account synthesis.
+execute: |
+  set -eu
+
+  export SNAP_USER="4343:snapd-fallback"
+  unset SNAP_REAL_HOME
+  unset SHELL
+
+  getent passwd snapd-fallback | MATCH '^snapd-fallback:x:4343:4343::/nonexistent:/bin/false$'

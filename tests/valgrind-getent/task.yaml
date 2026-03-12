@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+summary: getent under valgrind has no memory errors
+details: |
+  This test runs getent with the nss-snapd module active under valgrind to
+  detect invalid reads/writes, use-after-free, and leak-related errors reported
+  by memcheck while resolving a synthetic passwd entry from SNAP_USER.
+artifacts:
+  - valgrind/getent-name.log
+  - valgrind/getent-uid.log
+execute: |
+  set -eu
+
+  export SNAP_USER="5252:snapd-valgrind"
+  export SNAP_REAL_HOME="/home/snapd-valgrind"
+  export SHELL="/bin/bash"
+
+  mkdir -p valgrind
+
+  run_valgrind_getent() {
+    query="$1"
+    log_file="$2"
+    : > "$log_file"
+    if ! output="$(valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=definite,indirect,possible --error-exitcode=1 --log-file="$log_file" getent passwd "$query")"; then
+      cat "$log_file" >&2
+      return 1
+    fi
+    printf '%s\n' "$output"
+  }
+
+  entry_by_name="$(run_valgrind_getent snapd-valgrind valgrind/getent-name.log)"
+  printf '%s\n' "$entry_by_name" | MATCH '^snapd-valgrind:x:5252:5252::/home/snapd-valgrind:/bin/bash$'
+
+  entry_by_uid="$(run_valgrind_getent 5252 valgrind/getent-uid.log)"
+  printf '%s\n' "$entry_by_uid" | MATCH '^snapd-valgrind:x:5252:5252::/home/snapd-valgrind:/bin/bash$'

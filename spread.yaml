@@ -1,0 +1,129 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+project: nss-snapd
+path: /root/nss-snapd
+exclude:
+  - .git
+  - .image-garden/
+  - '*.o'
+  - '*.so'
+  - '*.so.*'
+  - test_nss_snapd
+  - '*.qcow2'
+  - '*.qcow2.log'
+  - '*.seed.iso'
+  - '*.img'
+  - '*.run'
+  - '*.lock'
+  - '*.meta-data'
+  - '*.user-data'
+  - '*.serial.log'
+  - '*.stderr.log'
+  - '*.stdout.log'
+  - .spread-reuse*.yaml
+  - spread-artifacts/
+
+backends:
+  garden:
+    type: adhoc
+    allocate: |
+      # Respect caller-provided PATH when running under wrappers.
+      if [ -n "${SPREAD_HOST_PATH-}" ]; then
+        PATH="$SPREAD_HOST_PATH"
+      fi
+      # Ask image-garden to allocate a VM matching the spread system and host arch.
+      exec image-garden allocate --spread "$SPREAD_SYSTEM"."$(uname -m)"
+    discard: |
+      # Keep PATH handling symmetric with allocate.
+      if [ -n "${SPREAD_HOST_PATH-}" ]; then
+        PATH="$SPREAD_HOST_PATH"
+      fi
+      # Tear down the VM that was allocated for this spread job.
+      exec image-garden discard "$SPREAD_SYSTEM_ADDRESS"
+    systems:
+      - ubuntu-cloud-16.04:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-cloud-18.04:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-cloud-20.04:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-cloud-22.04:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-cloud-24.04:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-cloud-26.04:
+          username: ubuntu
+          password: ubuntu
+
+prepare: |
+  set -eu
+
+  # Discover the Debian multiarch triplet to install into the right libdir.
+  multiarch="$(gcc -print-multiarch 2>/dev/null || true)"
+  if [ -z "$multiarch" ] && command -v dpkg-architecture >/dev/null 2>&1; then
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+  fi
+  if [ -z "$multiarch" ]; then
+    echo "Unable to determine host multiarch triplet" >&2
+    exit 1
+  fi
+
+  # Build and install the NSS module from the project directory spread synced.
+  cd "$SPREAD_PATH"
+  make clean
+  make
+  make install libdir="/lib/$multiarch"
+
+restore: |
+  set -eu
+
+  # Recompute multiarch so cleanup works even if prepare failed halfway.
+  multiarch="$(gcc -print-multiarch 2>/dev/null || true)"
+  if [ -z "$multiarch" ] && command -v dpkg-architecture >/dev/null 2>&1; then
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+  fi
+  if [ -n "$multiarch" ]; then
+    # Remove the installed NSS module from the system under test.
+    rm -f "/lib/$multiarch/libnss_snapd.so.2"
+  fi
+
+  # Drop local build artifacts from the synced project tree.
+  cd "$SPREAD_PATH"
+  make clean
+
+suites:
+  tests/:
+    summary: NSS snapd integration tests
+    prepare: |
+      set -eu
+
+      # Preserve the original NSS config inside the guest system.
+      backup_file="/tmp/nsswitch.conf.nss-snapd.bak"
+      cp /etc/nsswitch.conf "$backup_file"
+
+      # Ensure the passwd database chain contains our module once per suite run.
+      if awk '/^passwd:/{for(i=1;i<=NF;i++) if($i=="snapd") found=1} END{exit found?0:1}' /etc/nsswitch.conf; then
+        # Already configured; keep current ordering.
+        :
+      elif grep -q '^passwd:' /etc/nsswitch.conf; then
+        # Append snapd to existing passwd line without removing current providers.
+        sed -i '/^passwd:/ s/$/ snapd/' /etc/nsswitch.conf
+      else
+        # Defensive fallback for unusual nsswitch configurations missing passwd line.
+        echo 'passwd: files snapd' >> /etc/nsswitch.conf
+      fi
+    restore: |
+      set -eu
+
+      # Always restore original nsswitch.conf so tasks remain isolated across runs.
+      backup_file="/tmp/nsswitch.conf.nss-snapd.bak"
+      if [ -f "$backup_file" ]; then
+        cp "$backup_file" /etc/nsswitch.conf
+      fi
+      rm -f "$backup_file"

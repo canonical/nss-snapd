@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+# Local build outputs
+*.o
+libnss_snapd.so.2
+test_nss_snapd
+
+# image-garden state directory
+.image-garden/
+!.image-garden/README.md
+
+# image-garden generated firmware images/links
+.image-garden/efi-code.*.img
+.image-garden/efi-vars.*.img
+.image-garden/*.efi-code.img
+.image-garden/*.efi-vars.img
+
+# image-garden generated VM artifacts
+.image-garden/*.lock
+.image-garden/*.run
+.image-garden/*.qcow2
+.image-garden/*.qcow2.log
+.image-garden/*.seed.iso
+.image-garden/*.meta-data
+.image-garden/*.user-data
+
+# spread temporary files and artifacts
+.spread-reuse*.yaml
+spread-artifacts/

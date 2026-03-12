@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: nss-snapd
+Upstream-Contact: Zygmunt Krynicki <zygmunt.krynicki@canonical.com>
+Source: github.com/canonical/nss-snapd
+
+# Sample paragraph, commented out:
+#
+# Files: src/*
+# Copyright: $YEAR $NAME <$CONTACT>
+# License: ...
