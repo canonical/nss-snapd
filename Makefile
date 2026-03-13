@@ -29,7 +29,12 @@ REQUIRED_SYMBOLS := \
 	_nss_snapd_getpwuid_r \
 	_nss_snapd_setpwent \
 	_nss_snapd_getpwent_r \
-	_nss_snapd_endpwent
+	_nss_snapd_endpwent \
+	_nss_snapd_getgrnam_r \
+	_nss_snapd_getgrgid_r \
+	_nss_snapd_setgrent \
+	_nss_snapd_getgrent_r \
+	_nss_snapd_endgrent
 
 .PHONY: all clean check check-symbols fmt install
 

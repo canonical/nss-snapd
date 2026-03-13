@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 #include <errno.h>
+#include <grp.h>
 #include <inttypes.h>
 #include <nss.h>
 #include <pwd.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -144,6 +146,50 @@ static enum nss_status fill_passwd(const struct snap_identity *identity,
   return NSS_STATUS_SUCCESS;
 }
 
+/*
+ * Populate struct group using caller-provided storage.
+ *
+ * The module synthesizes only a primary group identity and deliberately leaves
+ * gr_mem empty because SNAP_USER does not encode auxiliary group membership.
+ */
+static enum nss_status fill_group(const struct snap_identity *identity,
+                                  struct group *grp, char *buffer,
+                                  size_t buflen, int *errnop) {
+  static const char passwd_value[] = "x";
+
+  size_t name_len = identity->name_len + 1U;
+  size_t passwd_len = sizeof(passwd_value);
+  size_t members_len = sizeof(char *);
+  size_t align_mask = _Alignof(char *) - 1U;
+  uintptr_t raw_addr = (uintptr_t)buffer;
+  uintptr_t members_addr = (raw_addr + align_mask) & ~(uintptr_t)align_mask;
+  size_t members_offset = (size_t)(members_addr - raw_addr);
+  size_t required = members_offset + members_len + name_len + passwd_len;
+  char **members;
+  char *cursor;
+
+  if (required > buflen) {
+    set_error(errnop, ERANGE);
+    return NSS_STATUS_TRYAGAIN;
+  }
+
+  members = (char **)(void *)(buffer + members_offset);
+  cursor = buffer + members_offset + members_len;
+
+  memcpy(cursor, identity->name, name_len);
+  grp->gr_name = cursor;
+  cursor += name_len;
+
+  memcpy(cursor, passwd_value, passwd_len);
+  grp->gr_passwd = cursor;
+
+  grp->gr_gid = (gid_t)identity->uid;
+  grp->gr_mem = members;
+  members[0] = NULL;
+
+  return NSS_STATUS_SUCCESS;
+}
+
 /* NSS name lookup entry point for service "snapd". */
 enum nss_status _nss_snapd_getpwnam_r(const char *name, struct passwd *pwd,
                                       char *buffer, size_t buflen,
@@ -197,6 +243,56 @@ enum nss_status _nss_snapd_getpwuid_r(uid_t uid, struct passwd *pwd,
   return fill_passwd(&identity, pwd, buffer, buflen, errnop);
 }
 
+/* NSS group-name lookup entry point for service "snapd". */
+enum nss_status _nss_snapd_getgrnam_r(const char *name, struct group *grp,
+                                      char *buffer, size_t buflen,
+                                      int *errnop) {
+  struct snap_identity identity;
+  enum nss_status status;
+
+  if (name == NULL || grp == NULL || buffer == NULL) {
+    set_error(errnop, EINVAL);
+    return NSS_STATUS_UNAVAIL;
+  }
+
+  status = parse_snap_user(&identity, errnop);
+  if (status != NSS_STATUS_SUCCESS) {
+    return status;
+  }
+
+  if (strcmp(name, identity.name) != 0) {
+    set_error(errnop, ENOENT);
+    return NSS_STATUS_NOTFOUND;
+  }
+
+  return fill_group(&identity, grp, buffer, buflen, errnop);
+}
+
+/* NSS group-id lookup entry point for service "snapd". */
+enum nss_status _nss_snapd_getgrgid_r(gid_t gid, struct group *grp,
+                                      char *buffer, size_t buflen,
+                                      int *errnop) {
+  struct snap_identity identity;
+  enum nss_status status;
+
+  if (grp == NULL || buffer == NULL) {
+    set_error(errnop, EINVAL);
+    return NSS_STATUS_UNAVAIL;
+  }
+
+  status = parse_snap_user(&identity, errnop);
+  if (status != NSS_STATUS_SUCCESS) {
+    return status;
+  }
+
+  if ((uintmax_t)gid != (uintmax_t)identity.uid) {
+    set_error(errnop, ENOENT);
+    return NSS_STATUS_NOTFOUND;
+  }
+
+  return fill_group(&identity, grp, buffer, buflen, errnop);
+}
+
 enum nss_status _nss_snapd_setpwent(int stayopen) {
   (void)stayopen;
   /* No internal iteration state is maintained in MVP mode. */
@@ -215,3 +311,20 @@ enum nss_status _nss_snapd_getpwent_r(struct passwd *pwd, char *buffer,
 }
 
 enum nss_status _nss_snapd_endpwent(void) { return NSS_STATUS_SUCCESS; }
+
+enum nss_status _nss_snapd_setgrent(int stayopen) {
+  (void)stayopen;
+  return NSS_STATUS_SUCCESS;
+}
+
+enum nss_status _nss_snapd_getgrent_r(struct group *grp, char *buffer,
+                                      size_t buflen, int *errnop) {
+  (void)grp;
+  (void)buffer;
+  (void)buflen;
+
+  set_error(errnop, ENOENT);
+  return NSS_STATUS_NOTFOUND;
+}
+
+enum nss_status _nss_snapd_endgrent(void) { return NSS_STATUS_SUCCESS; }

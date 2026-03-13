@@ -118,6 +118,18 @@ suites:
         # Defensive fallback for unusual nsswitch configurations missing passwd line.
         echo 'passwd: files snapd' >> /etc/nsswitch.conf
       fi
+
+      # Ensure the group database chain also includes the snapd module.
+      if awk '/^group:/{for(i=1;i<=NF;i++) if($i=="snapd") found=1} END{exit found?0:1}' /etc/nsswitch.conf; then
+        # Already configured; keep current ordering.
+        :
+      elif grep -q '^group:' /etc/nsswitch.conf; then
+        # Append snapd to existing group line without removing current providers.
+        sed -i '/^group:/ s/$/ snapd/' /etc/nsswitch.conf
+      else
+        # Defensive fallback for unusual nsswitch configurations missing group line.
+        echo 'group: files snapd' >> /etc/nsswitch.conf
+      fi
     restore: |
       set -eu
 

@@ -1,13 +1,15 @@
 # SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
 # SPDX-License-Identifier: LGPL-3.0-only
 
-summary: existing passwd users resolve via files
+summary: existing passwd users and groups resolve via files
 details: |
   This test verifies that enabling the nss-snapd module does not break standard
-  passwd resolution for users that already exist in /etc/passwd, such as root
-  and ubuntu. It confirms the files provider continues to work in the chain.
+  passwd/group resolution for identities that already exist in system databases,
+  such as root and ubuntu. It confirms the files provider continues to work in
+  the chain.
 execute: |
   set -eu
 
   getent passwd root | MATCH '^root:'
   getent passwd ubuntu | MATCH '^ubuntu:'
+  getent group root | MATCH '^root:'

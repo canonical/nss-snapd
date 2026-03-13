@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
 # SPDX-License-Identifier: LGPL-3.0-only
 
-summary: valid SNAP_USER resolves synthetic passwd entry
+summary: valid SNAP_USER resolves synthetic passwd and group entries
 details: |
   This test validates the main happy path where SNAP_USER supplies a valid
-  uid:name pair and the module synthesizes a passwd entry with the expected uid,
-  gid, home directory, and shell for both name and uid lookups.
+  uid:name pair and the module synthesizes passwd and group entries with the
+  expected ids and fields for both name and numeric-id lookups.
 execute: |
   set -eu
 
@@ -15,3 +15,5 @@ execute: |
 
   getent passwd snapd-synthetic | MATCH '^snapd-synthetic:x:4242:4242::/home/snapd-synthetic:/bin/bash$'
   getent passwd 4242 | MATCH '^snapd-synthetic:x:4242:4242::/home/snapd-synthetic:/bin/bash$'
+  getent group snapd-synthetic | MATCH '^snapd-synthetic:x:4242:$'
+  getent group 4242 | MATCH '^snapd-synthetic:x:4242:$'

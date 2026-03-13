@@ -5,12 +5,12 @@ SPDX-License-Identifier: LGPL-3.0-only
 
 # NSS snapd module MVP
 
-This repository contains a minimal NSS passwd module that resolves one
+This repository contains a minimal NSS passwd/group module that resolves one
 synthetic identity from the `SNAP\_USER` environment variable.
 
 ## Behavior
 
-The module exports the NSS passwd entrypoints for service name snapd.
+The module exports the NSS passwd and group entrypoints for service name snapd.
 
 Expected input:
 - `SNAP_USER` with format `uid:name`
@@ -26,10 +26,14 @@ Fallbacks when optional inputs are missing:
 Lookup behavior:
 - If requested name or uid matches `SNAP_USER`, return a synthetic passwd
   entry.
+- If requested group name or gid matches `SNAP_USER`, return a synthetic group
+  entry where gid equals uid and group name equals user name.
+- Group membership is always empty because `SNAP_USER` does not encode
+  auxiliary groups.
 - If `SNAP_USER` is missing, malformed, or does not match, return `NOTFOUND` so
   the NSS chain can continue with other providers.
-- Enumeration is intentionally unsupported in this MVP; `getpwent` returns
-  `NOTFOUND`.
+- Enumeration is intentionally unsupported in this MVP; `getpwent` and
+  `getgrent` return `NOTFOUND`.
 
 ## Build
 
@@ -89,7 +93,8 @@ Typical steps when integrating into a base image:
 
 1. Install the shared object in the base library directory, for example:
    - `/lib/x86\_64-linux-gnu/libnss\_snapd.so.2`
-2. Add snapd to the passwd nsswitch line in the base configuration:
+2. Add snapd to passwd and group nsswitch lines in the base configuration:
    - `passwd: files snapd`
+   - `group: files snapd`
 
 The exact path can vary by architecture and base.
