@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload spread artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: raw-spread-artifacts-${{ matrix.garden-system }}
           path: spread-artifacts/
