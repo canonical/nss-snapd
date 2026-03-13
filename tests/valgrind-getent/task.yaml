@@ -1,11 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
 # SPDX-License-Identifier: LGPL-3.0-only
 
-summary: passwd and group getent under valgrind have no memory errors
+summary: passwd and group getent under valgrind have no unsuppressed memory errors
 details: |
   This test runs getent with the nss-snapd module active under valgrind to
   detect invalid reads/writes, use-after-free, and leak-related errors reported
   by memcheck while resolving synthetic passwd and group entries from SNAP_USER.
+  Known process-lifetime allocations from glibc/NSS module loading are
+  suppressed; any remaining unsuppressed leak kind fails the test.
 artifacts:
   - valgrind/getent-name.log
   - valgrind/getent-uid.log
@@ -17,6 +19,7 @@ execute: |
   export SNAP_USER="5252:snapd-valgrind"
   export SNAP_REAL_HOME="/home/snapd-valgrind"
   export SHELL="/bin/bash"
+  suppression_file=valgrind.supp
 
   mkdir -p valgrind
 
@@ -25,7 +28,7 @@ execute: |
     query="$2"
     log_file="$3"
     : > "$log_file"
-    if ! output="$(valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=definite,indirect,possible --error-exitcode=1 --log-file="$log_file" getent "$database" "$query")"; then
+    if ! output="$(valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 --suppressions="$suppression_file" --log-file="$log_file" getent "$database" "$query")"; then
       cat "$log_file" >&2
       return 1
     fi

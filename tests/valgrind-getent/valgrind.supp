@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 Zygmunt Krynicki
+# SPDX-License-Identifier: LGPL-3.0-only
+
+# Known process-lifetime allocations in glibc's loader while NSS modules are
+# loaded via getent. These stacks vary across glibc versions, so only stable
+# loader landmarks are matched.
+{
+   # ld.so duplicates cache path strings while resolving NSS DSOs.
+   # These allocations are process-lifetime on some glibc versions.
+   nss_getent_rtld_cache_lookup_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:_dl_load_cache_lookup
+   ...
+   fun:_dl_open
+}
+
+{
+   # Loader bookkeeping allocated with malloc for each mapped DSO object.
+   # Frame names around this differ by release (_dl_map_object/new_object).
+   nss_getent_rtld_new_object_malloc_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   ...
+   fun:_dl_open
+}
+
+{
+   # Zeroed link-map/version structures allocated with calloc during dlopen.
+   # Reachable at process exit when NSS modules stay loaded.
+   nss_getent_rtld_new_object_calloc_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   ...
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   ...
+   fun:_dl_open
+}
+
+{
+   # Version-check tables built by ld.so for dlopened NSS modules.
+   # Kept until process teardown in older and newer glibc variants.
+   nss_getent_rtld_map_versions_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   ...
+   fun:_dl_check_map_versions
+   ...
+   fun:__libc_dlopen_mode
+}
+
+# nss_systemd may keep process-lifetime buffers/TLS state in get* paths.
+{
+   # systemd NSS keeps small caches/TLS-backed state in getpw/getgr paths.
+   # Symbol visibility differs by distro, so match the stable public prefix.
+   nss_getent_nss_systemd_get_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:_nss_systemd_get*
+}
