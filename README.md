@@ -6,7 +6,7 @@ SPDX-License-Identifier: LGPL-3.0-only
 # NSS snapd module MVP
 
 This repository contains a minimal NSS passwd/group module that resolves one
-synthetic identity from the `SNAP\_USER` environment variable.
+synthetic identity from the `SNAP_USER` environment variable.
 
 ## Behavior
 
@@ -92,7 +92,7 @@ directory.
 Typical steps when integrating into a base image:
 
 1. Install the shared object in the base library directory, for example:
-   - `/lib/x86\_64-linux-gnu/libnss\_snapd.so.2`
+   - `/lib/x86_64-linux-gnu/libnss_snapd.so.2`
 2. Add snapd to passwd and group nsswitch lines in the base configuration:
    - `passwd: files snapd`
    - `group: files snapd`
